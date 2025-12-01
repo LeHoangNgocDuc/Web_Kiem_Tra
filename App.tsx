@@ -1,6 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { parseDocx } from './utils/docxParser'; // Đảm bảo đường dẫn đúng
-import { ExamData, Question, AnswerKey } from './types'; // Đảm bảo đường dẫn đúng
+import React, { useState, useEffect } from 'react';
+import { parseDocx } from './utils/docxParser'; 
+import { ExamData, Question, AnswerKey } from './types'; 
+
+// --- KHAI BÁO MATHJAX ĐỂ TRÁNH LỖI TS ---
+declare global {
+  interface Window {
+    MathJax: any;
+  }
+}
 
 // --- COMPONENT CON: HIỂN THỊ TỪNG CÂU HỎI ---
 interface QuestionItemProps {
@@ -8,7 +15,7 @@ interface QuestionItemProps {
   userAnswer: string;
   onSelectAnswer: (qId: string, optId: string) => void;
   isSubmitted: boolean;
-  answerKey?: AnswerKey; // Chỉ truyền vào khi đã nộp bài
+  answerKey?: AnswerKey;
 }
 
 const QuestionItem: React.FC<QuestionItemProps> = ({ 
@@ -16,15 +23,13 @@ const QuestionItem: React.FC<QuestionItemProps> = ({
 }) => {
   const [showSolution, setShowSolution] = useState(false);
 
-  // Xác định trạng thái đúng sai để tô màu
+  // Tô màu đáp án
   const getOptionColor = (optId: string) => {
     if (!isSubmitted) {
-      // Khi đang làm: Chọn thì màu xanh dương, chưa chọn thì màu trắng
       return userAnswer === optId ? '#e6f7ff' : 'white';
     } else {
-      // Khi đã nộp:
-      if (optId === answerKey?.correctOptionId) return '#d4edda'; // Đáp án đúng -> Xanh lá nhạt
-      if (optId === userAnswer && optId !== answerKey?.correctOptionId) return '#f8d7da'; // Chọn sai -> Đỏ nhạt
+      if (optId === answerKey?.correctOptionId) return '#d4edda'; // Đúng -> Xanh lá
+      if (optId === userAnswer && optId !== answerKey?.correctOptionId) return '#f8d7da'; // Sai -> Đỏ
       return 'white';
     }
   };
@@ -34,13 +39,13 @@ const QuestionItem: React.FC<QuestionItemProps> = ({
       background: '#fff', padding: '20px', marginBottom: '20px', borderRadius: '8px', 
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)', border: '1px solid #eee' 
     }}>
-      {/* 1. NỘI DUNG CÂU HỎI */}
+      {/* Câu hỏi */}
       <div style={{ marginBottom: '15px', fontSize: '16px', lineHeight: '1.6' }}>
         <strong style={{ color: '#007bff' }}>Câu {question.number}: </strong>
         <span dangerouslySetInnerHTML={{ __html: question.text }} />
       </div>
 
-      {/* 2. DANH SÁCH ĐÁP ÁN */}
+      {/* Đáp án */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         {question.options.map(opt => (
           <div 
@@ -60,26 +65,23 @@ const QuestionItem: React.FC<QuestionItemProps> = ({
         ))}
       </div>
 
-      {/* 3. PHẦN HIỂN THỊ SAU KHI NỘP BÀI */}
+      {/* Kết quả sau khi nộp */}
       {isSubmitted && answerKey && (
         <div style={{ marginTop: '15px', borderTop: '1px dashed #ccc', paddingTop: '15px' }}>
-          {/* Thông báo kết quả câu này */}
           <div style={{ marginBottom: '10px', fontWeight: 'bold', color: userAnswer === answerKey.correctOptionId ? 'green' : 'red' }}>
             {userAnswer === answerKey.correctOptionId ? '✓ Làm đúng' : `✗ Làm sai (Đáp án đúng: ${answerKey.correctOptionId})`}
           </div>
 
-          {/* Nút xem lời giải (Giống Azota) */}
           <button 
             onClick={() => setShowSolution(!showSolution)}
             style={{
               background: showSolution ? '#6c757d' : '#17a2b8',
-              color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px'
+              color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer'
             }}
           >
             {showSolution ? 'Ẩn lời giải' : 'Xem lời giải chi tiết'}
           </button>
           
-          {/* Nội dung lời giải */}
           {showSolution && (
             <div 
               style={{ marginTop: '10px', background: '#f8f9fa', padding: '15px', borderRadius: '5px', borderLeft: '4px solid #17a2b8' }}
@@ -100,8 +102,18 @@ const App: React.FC = () => {
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0); // Thời gian tính bằng giây
+  const [timeLeft, setTimeLeft] = useState(0); 
   const [isLoading, setIsLoading] = useState(false);
+  
+  // State mới: Nhập thời gian thủ công
+  const [manualDuration, setManualDuration] = useState<number>(45); 
+
+  // --- QUAN TRỌNG: TRIGGER MATHJAX KHI CÓ NỘI DUNG MỚI ---
+  useEffect(() => {
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      window.MathJax.typesetPromise();
+    }
+  }); // Chạy mỗi khi render lại
 
   // Xử lý Upload file
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,18 +123,18 @@ const App: React.FC = () => {
         const file = e.target.files[0];
         const data = await parseDocx(file);
         
-        // Ép kiểu về ExamData (vì parseDocx trả về Partial)
         if (data.questions && data.answers) {
            const fullData: ExamData = {
                id: Date.now().toString(),
                title: data.title || file.name,
-               duration: data.duration || 45, // Mặc định 45 phút nếu không tìm thấy
+               // Ưu tiên lấy thời gian admin nhập, nếu không nhập thì lấy từ file
+               duration: manualDuration > 0 ? manualDuration : (data.duration || 45), 
                questions: data.questions,
                answers: data.answers,
                createdAt: Date.now()
            };
            setExam(fullData);
-           setTimeLeft(fullData.duration * 60); // Cài đặt đồng hồ
+           setTimeLeft(fullData.duration * 60); 
            setIsSubmitted(false);
            setUserAnswers({});
            setScore(0);
@@ -138,51 +150,42 @@ const App: React.FC = () => {
   // Đồng hồ đếm ngược
   useEffect(() => {
     if (!exam || isSubmitted || timeLeft <= 0) return;
-
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmit(); // Hết giờ tự động nộp
+          handleSubmit(); 
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, [exam, isSubmitted, timeLeft]);
 
-  // Format thời gian MM:SS
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // Xử lý chọn đáp án
   const handleSelectAnswer = (qId: string, optId: string) => {
     setUserAnswers(prev => ({ ...prev, [qId]: optId }));
   };
 
-  // Xử lý nộp bài
   const handleSubmit = () => {
     if (!exam) return;
-    
-    // Tính điểm
     let correctCount = 0;
     exam.answers.forEach(ans => {
       if (userAnswers[ans.questionId] === ans.correctOptionId) {
         correctCount++;
       }
     });
-    
-    // Giả sử thang điểm 10
     const finalScore = (correctCount / exam.questions.length) * 10;
     setScore(parseFloat(finalScore.toFixed(2)));
     setIsSubmitted(true);
     alert(`Đã nộp bài! Điểm của bạn: ${parseFloat(finalScore.toFixed(2))}`);
-    window.scrollTo(0, 0); // Cuộn lên đầu xem kết quả
+    window.scrollTo(0, 0); 
   };
 
   return (
@@ -191,16 +194,32 @@ const App: React.FC = () => {
       {/* HEADER & UPLOAD */}
       <div style={{ background: '#fff', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', textAlign: 'center' }}>
         <h1 style={{ color: '#007bff', margin: '0 0 10px 0' }}>Hệ Thống Thi Trắc Nghiệm Online</h1>
+        
+        {/* CHỈ HIỆN PHẦN NÀY KHI CHƯA CÓ ĐỀ THI */}
         {!exam && (
-          <div style={{ marginTop: '20px' }}>
-            <label style={{ 
-              background: '#28a745', color: '#fff', padding: '10px 20px', 
-              borderRadius: '5px', cursor: 'pointer', fontSize: '16px' 
-            }}>
-              📂 Tải lên đề thi (.docx)
-              <input type="file" accept=".docx" onChange={handleFileUpload} style={{ display: 'none' }} />
-            </label>
-            {isLoading && <p>Đang xử lý đề thi...</p>}
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            
+            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'start'}}>
+              <label style={{fontWeight: 'bold', marginBottom: '5px'}}>Thời gian (phút):</label>
+              <input 
+                type="number" 
+                value={manualDuration} 
+                onChange={(e) => setManualDuration(parseInt(e.target.value))}
+                style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc', width: '100px', fontSize: '16px' }}
+              />
+            </div>
+
+            <div style={{marginTop: '23px'}}>
+              <label style={{ 
+                background: '#28a745', color: '#fff', padding: '12px 25px', 
+                borderRadius: '5px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' 
+              }}>
+                📂 Tải lên đề thi (.docx)
+                <input type="file" accept=".docx" onChange={handleFileUpload} style={{ display: 'none' }} />
+              </label>
+            </div>
+
+            {isLoading && <p style={{width: '100%', marginTop: '10px'}}>⏳ Đang xử lý đề thi...</p>}
           </div>
         )}
       </div>
@@ -209,7 +228,7 @@ const App: React.FC = () => {
       {exam && (
         <div style={{ maxWidth: '800px', margin: '20px auto', padding: '0 15px' }}>
           
-          {/* INFO BAR & CLOCK */}
+          {/* INFO BAR */}
           <div style={{ 
             background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '20px',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -217,7 +236,7 @@ const App: React.FC = () => {
           }}>
             <div>
               <h3 style={{ margin: 0 }}>{exam.title}</h3>
-              <small>Số câu: {exam.questions.length} | Thời gian: {exam.duration} phút</small>
+              <small>Số câu: {exam.questions.length}</small>
             </div>
             
             {!isSubmitted ? (
