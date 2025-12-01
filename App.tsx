@@ -2,22 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { parseDocx } from './utils/docxParser';
 import { ExamData, Question, AnswerKey } from './types';
 
-// --- PHẦN 1: HÀM HỖ TRỢ MATHJAX (SỬA LỖI HIỂN THỊ) ---
-// Component này bọc lấy nội dung có công thức Toán để ép nó hiển thị đúng
-const MathContent = ({ html }: { html: string }) => {
+// --- 1. COMPONENT HIỂN THỊ MATHJAX (QUAN TRỌNG) ---
+// Component này giúp tự động "vẽ" lại công thức toán mỗi khi nội dung thay đổi
+const MathContent = ({ html, className = "" }: { html: string, className?: string }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Mỗi khi html thay đổi, gọi MathJax vẽ lại công thức trong div này
-    if (ref.current && (window as any).MathJax && (window as any).MathJax.typesetPromise) {
-      (window as any).MathJax.typesetPromise([ref.current]);
+    if (ref.current && window.MathJax && window.MathJax.typesetPromise) {
+      // Gọi MathJax xử lý nội dung trong thẻ div này
+      window.MathJax.typesetPromise([ref.current]).catch((err: any) => console.log(err));
     }
   }, [html]);
 
-  return <div ref={ref} className="math-content" dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div ref={ref} className={`math-content ${className}`} dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
-// --- PHẦN 2: COMPONENT CÂU HỎI ---
+// --- 2. COMPONENT CÂU HỎI ---
 const QuestionItem = ({ 
   q, userAnswer, onSelect, isSubmitted, answerKey 
 }: { 
@@ -25,58 +25,67 @@ const QuestionItem = ({
 }) => {
   const [showSolution, setShowSolution] = useState(false);
 
-  // Trigger lại MathJax khi bấm xem lời giải
-  useEffect(() => {
-    if (showSolution && (window as any).MathJax) {
-      setTimeout(() => (window as any).MathJax.typesetPromise(), 100);
+  // Màu sắc đáp án
+  const getOptionStyle = (optId: string) => {
+    const baseStyle = "border p-3 rounded cursor-pointer transition flex items-center gap-2 hover:bg-gray-50";
+    
+    if (!isSubmitted) {
+      // Đang làm bài: Chọn thì xanh, chưa chọn thì trắng
+      return userAnswer === optId 
+        ? `${baseStyle} bg-blue-100 border-blue-500 ring-1 ring-blue-500` 
+        : `${baseStyle} bg-white border-gray-300`;
+    } else {
+      // Đã nộp bài
+      if (optId === answerKey?.correctOptionId) return `${baseStyle} bg-green-100 border-green-600 ring-1 ring-green-600`; // Đúng
+      if (userAnswer === optId && optId !== answerKey?.correctOptionId) return `${baseStyle} bg-red-100 border-red-500`; // Sai
+      return `${baseStyle} bg-white opacity-60`; // Các câu còn lại
     }
-  }, [showSolution]);
-
-  // Logic màu sắc
-  const getBg = (optId: string) => {
-    if (!isSubmitted) return userAnswer === optId ? 'bg-blue-100 border-blue-500' : 'bg-white border-gray-200';
-    if (optId === answerKey?.correctOptionId) return 'bg-green-100 border-green-500'; // Đáp án đúng
-    if (userAnswer === optId) return 'bg-red-100 border-red-500'; // Trò chọn sai
-    return 'bg-white border-gray-200 opacity-50';
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow mb-6 border">
-      <div className="mb-4 text-lg">
-        <strong className="text-blue-600">Câu {q.number}:</strong>
-        <MathContent html={q.text} />
+    <div id={`question-${q.id}`} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 mb-6 scroll-mt-24">
+      <div className="mb-4 text-gray-800">
+        <div className="flex items-baseline gap-2 mb-2">
+          <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">Câu {q.number}</span>
+        </div>
+        <MathContent html={q.text} className="text-lg" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-3">
         {q.options.map(opt => (
           <div 
             key={opt.id} 
             onClick={() => !isSubmitted && onSelect(q.id, opt.id)}
-            className={`border p-3 rounded cursor-pointer transition flex items-center gap-2 ${getBg(opt.id)}`}
+            className={getOptionStyle(opt.id)}
           >
-            <span className="font-bold w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-xs">{opt.id}</span>
+            <span className={`font-bold w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs ${userAnswer === opt.id ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
+              {opt.id}
+            </span>
             <MathContent html={opt.text} />
           </div>
         ))}
       </div>
 
       {isSubmitted && answerKey && (
-        <div className="mt-4 pt-4 border-t">
-          {userAnswer === answerKey.correctOptionId 
-            ? <p className="text-green-600 font-bold mb-2">✓ Chính xác</p>
-            : <p className="text-red-600 font-bold mb-2">✗ Sai rồi (Đáp án: {answerKey.correctOptionId})</p>
-          }
-          
-          <button 
-            onClick={() => setShowSolution(!showSolution)}
-            className="text-sm bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700"
-          >
-            {showSolution ? 'Ẩn lời giải' : 'Xem lời giải chi tiết'}
-          </button>
+        <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50 -mx-5 -mb-5 px-5 pb-5 rounded-b-lg">
+          <div className="flex items-center justify-between mb-3">
+             <div className="font-bold">
+                {userAnswer === answerKey.correctOptionId 
+                  ? <span className="text-green-600">✓ Chính xác</span>
+                  : <span className="text-red-600">✗ Sai rồi. Đáp án đúng: <span className="text-xl inline-block border border-green-500 px-2 rounded bg-white text-green-700">{answerKey.correctOptionId}</span></span>
+                }
+             </div>
+             <button 
+                onClick={() => setShowSolution(!showSolution)}
+                className="text-sm text-blue-600 hover:text-blue-800 underline font-semibold"
+             >
+                {showSolution ? 'Ẩn lời giải' : 'Xem lời giải chi tiết'}
+             </button>
+          </div>
           
           {showSolution && (
-            <div className="mt-3 p-4 bg-gray-50 border-l-4 border-green-500 rounded">
-              <strong className="block mb-2 text-green-700">Hướng dẫn giải:</strong>
+            <div className="bg-white p-4 border border-blue-200 rounded shadow-sm text-gray-700">
+              <strong className="block mb-2 text-blue-700 border-b pb-1">Hướng dẫn giải:</strong>
               <MathContent html={answerKey.solutionText} />
             </div>
           )}
@@ -86,9 +95,8 @@ const QuestionItem = ({
   );
 };
 
-// --- PHẦN 3: ỨNG DỤNG CHÍNH ---
+// --- 3. APP CHÍNH ---
 export default function App() {
-  // State quản lý dữ liệu
   const [exam, setExam] = useState<ExamData | null>(() => {
     const saved = localStorage.getItem('EXAM_DATA');
     return saved ? JSON.parse(saved) : null;
@@ -118,7 +126,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [isExamStarted, isSubmitted, timeLeft]);
 
-  // Xử lý upload đề (ADMIN)
+  // Upload đề
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       try {
@@ -127,21 +135,20 @@ export default function App() {
           const newExam: ExamData = {
             id: Date.now().toString(),
             title: data.title || "Đề thi trắc nghiệm",
-            duration: manualDuration, // Lấy thời gian admin nhập
+            duration: manualDuration,
             questions: data.questions as Question[],
             answers: data.answers as any[],
             isActive: true
           };
           setExam(newExam);
           localStorage.setItem('EXAM_DATA', JSON.stringify(newExam));
-          alert('Tải đề thành công! Học sinh có thể vào thi ngay.');
-          setIsAdminMode(false); // Thoát chế độ admin
+          alert('Tải đề thành công!');
+          setIsAdminMode(false);
         }
-      } catch (err) { alert('Lỗi file: ' + err); }
+      } catch (err) { alert('Lỗi: ' + err); }
     }
   };
 
-  // Bắt đầu làm bài (HỌC SINH)
   const handleStart = () => {
     if (!exam) return;
     setUserAnswers({});
@@ -149,11 +156,9 @@ export default function App() {
     setScore(0);
     setTimeLeft(exam.duration * 60);
     setIsExamStarted(true);
-    // Cuộn lên đầu
     window.scrollTo(0, 0);
   };
 
-  // Nộp bài
   const handleSubmit = () => {
     if (!exam) return;
     let correct = 0;
@@ -162,136 +167,183 @@ export default function App() {
     });
     setScore(parseFloat(((correct / exam.questions.length) * 10).toFixed(2)));
     setIsSubmitted(true);
-    alert('Đã nộp bài!');
+    alert('Đã nộp bài! Đang chuyển sang xem kết quả...');
     window.scrollTo(0, 0);
   };
 
-  // Format giờ
-  const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const scrollToQuestion = (id: string) => {
+    const element = document.getElementById(`question-${id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
 
   // --- GIAO DIỆN ---
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
+    <div className="min-h-screen bg-gray-100 font-sans text-gray-800 pb-20">
       
       {/* HEADER */}
-      <div className="bg-white shadow p-4 flex justify-between items-center sticky top-0 z-50">
-        <h1 className="text-xl font-bold text-blue-700">📚 Hệ Thống Thi Trắc Nghiệm</h1>
+      <div className="bg-white shadow px-6 py-3 flex justify-between items-center sticky top-0 z-50 border-b border-gray-200">
+        <div className="flex items-center gap-2">
+           <span className="text-2xl">📝</span>
+           <h1 className="text-xl font-bold text-gray-800 hidden md:block">Thi Trắc Nghiệm Online</h1>
+        </div>
         
         {isExamStarted && !isSubmitted && (
-          <div className="text-2xl font-mono font-bold text-red-600 bg-red-50 px-3 py-1 rounded">
-            {fmtTime(timeLeft)}
-          </div>
+           <div className="flex flex-col items-center bg-red-50 px-4 py-1 rounded border border-red-100">
+              <span className="text-xs text-red-500 font-bold uppercase">Thời gian còn lại</span>
+              <span className="text-xl font-mono font-bold text-red-600">{fmtTime(timeLeft)}</span>
+           </div>
         )}
 
         {!isExamStarted && (
-           <button onClick={() => setIsAdminMode(!isAdminMode)} className="text-sm text-gray-400 hover:text-gray-600">
-             Admin Upload
+           <button onClick={() => setIsAdminMode(!isAdminMode)} className="text-xs text-gray-400 hover:text-blue-600 underline">
+             Giáo viên (Admin)
            </button>
         )}
       </div>
 
-      {/* ADMIN PANEL */}
+      {/* ADMIN UPLOAD */}
       {isAdminMode && !isExamStarted && (
-        <div className="max-w-2xl mx-auto mt-6 bg-white p-6 rounded shadow border-t-4 border-blue-500">
-          <h2 className="font-bold text-lg mb-4">Khu vực Giáo viên (Admin)</h2>
-          
-          <div className="mb-4">
-             <label className="block text-sm mb-1">Mật khẩu quản trị:</label>
+        <div className="max-w-xl mx-auto mt-6 bg-white p-6 rounded shadow-lg border-t-4 border-blue-600">
+          <h2 className="font-bold text-lg mb-4 text-gray-800">Khu vực tải đề thi</h2>
+          <div className="space-y-4">
              <input 
                type="password" 
-               className="border p-2 rounded w-full"
+               className="border p-2 rounded w-full bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                value={adminPass}
                onChange={e => setAdminPass(e.target.value)}
-               placeholder="Nhập mật khẩu..."
+               placeholder="Nhập mật khẩu (anphuc01)..."
              />
+             {adminPass === 'anphuc01' && (
+                <div className="bg-blue-50 p-4 rounded border border-blue-100 animate-fade-in">
+                  <div className="flex gap-4 mb-4">
+                    <div className="w-1/3">
+                      <label className="block font-bold text-sm mb-1 text-gray-600">Phút:</label>
+                      <input 
+                        type="number" 
+                        value={manualDuration}
+                        onChange={e => setManualDuration(Number(e.target.value))}
+                        className="border p-2 rounded w-full text-center font-bold"
+                      />
+                    </div>
+                    <div className="w-2/3">
+                      <label className="block font-bold text-sm mb-1 text-gray-600">File (.docx):</label>
+                      <input type="file" accept=".docx" onChange={handleUpload} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"/>
+                    </div>
+                  </div>
+                </div>
+             )}
           </div>
-
-          {adminPass === 'anphuc01' ? (
-            <div className="bg-green-50 p-4 rounded border border-green-200">
-              <div className="mb-4">
-                <label className="block font-bold mb-1">1. Thời gian thi (phút):</label>
-                <input 
-                  type="number" 
-                  value={manualDuration}
-                  onChange={e => setManualDuration(Number(e.target.value))}
-                  className="border p-2 rounded w-24 text-center font-bold"
-                />
-              </div>
-              <div>
-                <label className="block font-bold mb-1">2. Chọn file đề (.docx):</label>
-                <input type="file" accept=".docx" onChange={handleUpload} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">* Lưu ý: File Word cần chuyển MathType sang LaTeX trước khi tải lên.</p>
-            </div>
-          ) : <p className="text-red-500 text-sm">Vui lòng nhập đúng mật khẩu để tải đề.</p>}
         </div>
       )}
 
-      {/* MÀN HÌNH CHỜ (KHI CHƯA BẮT ĐẦU) */}
+      {/* MÀN HÌNH CHỜ */}
       {!isExamStarted && !isAdminMode && (
-        <div className="max-w-3xl mx-auto mt-10 text-center px-4">
+        <div className="max-w-4xl mx-auto mt-12 px-4 text-center">
           {exam ? (
-            <div className="bg-white p-8 rounded-lg shadow-lg">
-              <h2 className="text-2xl font-bold mb-2 text-blue-800">{exam.title}</h2>
-              <div className="flex justify-center gap-6 text-gray-600 mb-8">
-                <span>📝 Số câu: <strong>{exam.questions.length}</strong></span>
-                <span>⏱ Thời gian: <strong>{exam.duration} phút</strong></span>
+            <div className="bg-white p-10 rounded-xl shadow-xl border border-gray-100">
+              <div className="text-6xl mb-4">🎓</div>
+              <h2 className="text-3xl font-bold mb-2 text-gray-800">{exam.title}</h2>
+              <div className="flex justify-center gap-8 text-gray-600 my-6">
+                <div className="bg-gray-50 px-4 py-2 rounded border">📝 <strong>{exam.questions.length}</strong> câu hỏi</div>
+                <div className="bg-gray-50 px-4 py-2 rounded border">⏱ <strong>{exam.duration}</strong> phút</div>
               </div>
               <button 
                 onClick={handleStart}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transform transition hover:scale-105"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-12 rounded-full text-xl shadow-lg transform transition hover:scale-105 active:scale-95"
               >
-                BẮT ĐẦU LÀM BÀI 🚀
+                BẮT ĐẦU LÀM BÀI
               </button>
             </div>
           ) : (
-            <div className="bg-white p-10 rounded shadow">
-              <p className="text-xl text-gray-500">Chưa có đề thi nào được tải lên.</p>
-              <p className="text-sm text-gray-400 mt-2">Vui lòng liên hệ giáo viên.</p>
-            </div>
+            <div className="text-gray-400 py-20">Hiện chưa có đề thi nào.</div>
           )}
         </div>
       )}
 
-      {/* MÀN HÌNH THI & KẾT QUẢ */}
+      {/* GIAO DIỆN LÀM BÀI (MAIN + SIDEBAR) */}
       {isExamStarted && exam && (
-        <div className="max-w-4xl mx-auto mt-6 px-4 pb-20">
+        <div className="max-w-7xl mx-auto mt-6 px-2 md:px-4 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           
-          {/* HIỆN ĐIỂM SỐ KHI NỘP XONG */}
-          {isSubmitted && (
-            <div className="bg-green-100 border-l-4 border-green-500 p-6 mb-6 rounded shadow animate-bounce-short">
-              <h2 className="text-2xl font-bold text-green-800 text-center">
-                Kết Quả: {score} / 10 Điểm
-              </h2>
-              <div className="text-center mt-4">
-                <button onClick={() => {setIsExamStarted(false); setExam(null); localStorage.removeItem('EXAM_DATA');}} className="text-blue-600 underline text-sm">
-                  Làm đề khác / Tải lại trang
-                </button>
+          {/* CỘT TRÁI: DANH SÁCH CÂU HỎI (Chiếm 8 hoặc 9 phần) */}
+          <div className="md:col-span-8 lg:col-span-9">
+            {isSubmitted && (
+              <div className="bg-green-50 border border-green-200 p-6 mb-6 rounded-lg flex items-center justify-between">
+                 <div>
+                   <h2 className="text-2xl font-bold text-green-700">Kết quả: {score} điểm</h2>
+                   <p className="text-green-600">Số câu đúng: {exam.answers.filter(a => userAnswers[a.questionId] === a.correctOptionId).length} / {exam.questions.length}</p>
+                 </div>
+                 <button onClick={() => {setIsExamStarted(false); setExam(null); localStorage.removeItem('EXAM_DATA');}} className="px-4 py-2 bg-white border border-green-500 text-green-700 rounded hover:bg-green-100">
+                   Làm đề khác
+                 </button>
               </div>
+            )}
+
+            {exam.questions.map((q) => (
+              <QuestionItem 
+                key={q.id}
+                q={q}
+                userAnswer={userAnswers[q.id]}
+                onSelect={(qId: string, optId: string) => setUserAnswers(prev => ({...prev, [qId]: optId}))}
+                isSubmitted={isSubmitted}
+                answerKey={exam.answers.find(a => a.questionId === q.id)}
+              />
+            ))}
+          </div>
+
+          {/* CỘT PHẢI: BẢNG TRẢ LỜI (SIDEBAR - Giống Azota) */}
+          <div className="md:col-span-4 lg:col-span-3 sticky top-24">
+            <div className="bg-white p-4 rounded-lg shadow border border-gray-200 max-h-[calc(100vh-120px)] overflow-y-auto">
+               <h3 className="font-bold text-gray-700 mb-3 text-center border-b pb-2">Danh sách câu hỏi</h3>
+               
+               <div className="grid grid-cols-5 gap-2">
+                 {exam.questions.map((q, idx) => {
+                   // Logic màu nút
+                   let btnClass = "bg-white border-gray-300 text-gray-600 hover:bg-gray-100";
+                   
+                   if (!isSubmitted) {
+                      if (userAnswers[q.id]) btnClass = "bg-blue-600 text-white border-blue-600";
+                   } else {
+                      const ansKey = exam.answers.find(a => a.questionId === q.id);
+                      if (ansKey && userAnswers[q.id] === ansKey.correctOptionId) {
+                         btnClass = "bg-green-500 text-white border-green-500"; // Đúng
+                      } else if (userAnswers[q.id]) {
+                         btnClass = "bg-red-500 text-white border-red-500"; // Sai
+                      } else {
+                         btnClass = "bg-gray-100 text-gray-400"; // Chưa làm
+                      }
+                   }
+
+                   return (
+                     <button
+                       key={q.id}
+                       onClick={() => scrollToQuestion(q.id)}
+                       className={`w-full aspect-square flex items-center justify-center text-sm font-bold rounded border transition ${btnClass}`}
+                     >
+                       {q.number}
+                     </button>
+                   )
+                 })}
+               </div>
+
+               {!isSubmitted && (
+                 <button 
+                   onClick={() => { if(confirm('Bạn có chắc chắn muốn nộp bài?')) handleSubmit() }}
+                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded shadow transition"
+                 >
+                   NỘP BÀI
+                 </button>
+               )}
             </div>
-          )}
+          </div>
 
-          {/* DANH SÁCH CÂU HỎI */}
-          {exam.questions.map((q) => (
-            <QuestionItem 
-              key={q.id}
-              q={q}
-              userAnswer={userAnswers[q.id]}
-              onSelect={(qId: string, optId: string) => setUserAnswers(prev => ({...prev, [qId]: optId}))}
-              isSubmitted={isSubmitted}
-              answerKey={exam.answers.find(a => a.questionId === q.id)}
-            />
-          ))}
-
-          {/* NÚT NỘP BÀI */}
-          {!isSubmitted && (
-            <button 
-              onClick={() => { if(confirm('Nộp bài ngay?')) handleSubmit() }}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg shadow-lg text-xl"
-            >
-              NỘP BÀI THI
-            </button>
-          )}
         </div>
       )}
     </div>
