@@ -3,28 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MathExam Pro</title>
+    <title>MathExam Pro - Hệ Thống Thi Trắc Nghiệm</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <script>
       window.MathJax = {
         tex: {
+          // Cho phép dùng dấu $ để viết công thức cùng dòng (Inline math)
           inlineMath: [['$', '$'], ['\\(', '\\)']],
+          // Cho phép dùng $$ hoặc \[ \] để viết công thức xuống dòng (Display math)
           displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          processEscapes: true,
           packages: {'[+]': ['noerrors', 'noundefined']}
         },
         svg: {
           fontCache: 'global'
         },
         startup: {
+          // Tắt tự động chạy lúc đầu để React kiểm soát (tránh xung đột)
           typeset: false 
         }
       };
     </script>
+    
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <!-- Add Mammoth.js for processing Word documents -->
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    
     <style>
-        /* Custom scrollbar for better aesthetics */
+        /* Tùy chỉnh thanh cuộn cho đẹp */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -38,6 +46,8 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
+        
+        /* Đảm bảo hình ảnh trong đề thi không bị tràn màn hình */
         .math-content img {
             max-width: 100%;
             height: auto;
@@ -46,21 +56,29 @@
             display: inline-block;
             vertical-align: middle;
         }
+        
+        /* Căn chỉnh công thức toán MathJax */
+        mjx-container {
+            font-size: 110% !important; /* Phóng to công thức lên chút cho dễ đọc */
+        }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6"
+      }
+    }
+    </script>
+  </head>
+  
   <body class="bg-gray-50 text-gray-800 antialiased">
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>
