@@ -2,35 +2,71 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MathExam Pro</title>
+    <title>Hệ Thống Thi Trắc Nghiệm Online</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <script>
       window.MathJax = {
         tex: {
+          // Khai báo dấu $ là công thức toán (Inline)
           inlineMath: [['$', '$'], ['\\(', '\\)']],
+          // Khai báo $$ hoặc \[ \] là công thức toán khối (Block)
           displayMath: [['$$', '$$'], ['\\[', '\\]']],
-          processEscapes: true
+          processEscapes: true,
+        },
+        svg: {
+          fontCache: 'global'
         },
         startup: {
-          typeset: false // Tắt tự động để React kiểm soát
+          // Tắt tự động chạy ban đầu để React kiểm soát việc vẽ lại khi cần
+          typeset: false 
         }
       };
     </script>
+
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    
+
     <style>
-      .math-content img { max-width: 100% !important; height: auto; display: block; margin: 10px 0; }
-      .math-content { font-size: 1.1rem; line-height: 1.6; }
-      /* Ẩn thanh cuộn xấu xí */
-      .no-scrollbar::-webkit-scrollbar { display: none; }
-      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Tùy chỉnh thanh cuộn cho đẹp */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* QUAN TRỌNG: Sửa lỗi ảnh trong đề thi bị to quá khổ */
+        .math-content img {
+            max-width: 100% !important;
+            height: auto !important;
+            border-radius: 6px;
+            margin: 10px 0;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        /* Phóng to công thức toán lên một chút cho dễ đọc */
+        mjx-container {
+            font-size: 115% !important; 
+        }
     </style>
   </head>
-  <body class="bg-gray-100">
+  
+  <body class="bg-gray-100 text-gray-800 antialiased">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    
+    <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>
