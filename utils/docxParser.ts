@@ -1,33 +1,24 @@
 import { ExamData, Question, AnswerKey } from '../types';
 
-// Khai báo biến window mở rộng để tránh lỗi TypeScript
-declare global {
-  interface Window {
-    mammoth: any;
-  }
-}
-
 export const parseDocx = async (file: File): Promise<Partial<ExamData>> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
     reader.onload = function(event) {
       const arrayBuffer = event.target?.result;
-      
-      // Lấy mammoth từ window an toàn
       const mammoth = window.mammoth;
 
       if (!mammoth) {
-        reject("Lỗi: Thư viện Mammoth chưa tải được. Hãy tải lại trang (F5).");
+        reject("Lỗi: Thư viện Mammoth chưa tải. Vui lòng F5 lại trang.");
         return;
       }
 
       mammoth.convertToHtml({ arrayBuffer: arrayBuffer })
         .then(function(result: any) {
           let rawHtml = result.value;
-          // Giải mã ký tự HTML
+          // Giải mã ký tự
           rawHtml = rawHtml.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-          // Chuyển đổi MathType block sang inline để không vỡ dòng
+          // Chuyển khối MathType \[...\] thành dòng $...$
           rawHtml = rawHtml.replace(/\\\[/g, '$').replace(/\\\]/g, '$');
 
           const parsedData = parseHtmlToExam(rawHtml, file.name);
@@ -45,13 +36,11 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   
-  // Tự động tìm thời gian
+  // Tìm thời gian
   const fullText = doc.body.textContent || "";
   const timeMatch = fullText.match(/Thời gian(?: làm bài)?\s*[:.]?\s*(\d+)\s*(?:phút|'|phut)/i);
   let detectedDuration = 45; 
-  if (timeMatch && timeMatch[1]) {
-      detectedDuration = parseInt(timeMatch[1]);
-  }
+  if (timeMatch && timeMatch[1]) detectedDuration = parseInt(timeMatch[1]);
 
   const questions: Question[] = [];
   const answers: AnswerKey[] = [];
@@ -71,7 +60,6 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
   const saveQuestion = () => {
       if (currentQBuffer.length > 0) {
           const qId = `q_${Date.now()}_${questionCounter}`;
-          
           const qText = currentQBuffer.reduce((acc, curr, idx) => {
               if (idx === 0) return curr;
               if (curr.includes("<img")) return acc + "<br/>" + curr;
@@ -87,18 +75,19 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
               }, "");
           }
 
-          const detectedAns = detectCorrectAnswer(sText);
+          const match = sText.match(/(?:Chọn|Đáp án)\s*([A-D])/i);
+          const correctOptionId = match ? match[1].toUpperCase() : "A";
 
           questions.push({
               id: qId,
               number: questionCounter,
               text: qText,
-              options: tempOptions.length > 0 ? tempOptions : generateEmptyOptions()
+              options: tempOptions.length > 0 ? tempOptions : [{id:'A',text:'...'},{id:'B',text:'...'},{id:'C',text:'...'},{id:'D',text:'...'}]
           });
 
           answers.push({
               questionId: qId,
-              correctOptionId: detectedAns || "A", 
+              correctOptionId, 
               solutionText: sText 
           });
           
@@ -131,9 +120,18 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
     if (isScanningSolution) {
         currentSBuffer.push(innerHTML);
     } else {
-        const extracted = extractOptions(text);
-        if (extracted) {
-            tempOptions = extracted;
+        const hasOption = text.match(/^[A-D]\./) || (text.includes("A.") && text.includes("B."));
+        if (hasOption) {
+            const matches = [...text.matchAll(/([A-D])\./g)];
+            if (matches.length > 0) {
+                matches.forEach((m, idx) => {
+                     const optId = m[1];
+                     const nextMatch = matches[idx + 1];
+                     const startIndex = m.index! + 2; 
+                     const endIndex = nextMatch ? nextMatch.index : text.length;
+                     tempOptions.push({ id: optId, text: text.substring(startIndex, endIndex).trim() });
+                });
+            }
         } else {
             currentQBuffer.push(innerHTML);
         }
@@ -146,36 +144,7 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
       title: fileName.replace('.docx', ''), 
       duration: detectedDuration, 
       questions, 
-      answers 
+      answers,
+      isActive: true
   };
-};
-
-const generateEmptyOptions = () => [
-    {id: 'A', text: '...'}, {id: 'B', text: '...'}, {id: 'C', text: '...'}, {id: 'D', text: '...'}
-];
-
-const extractOptions = (text: string) => {
-    const hasOption = text.match(/^[A-D]\./) || (text.includes("A.") && text.includes("B."));
-    if (!hasOption) return null;
-
-    const options: any[] = [];
-    const matches = [...text.matchAll(/([A-D])\./g)];
-    
-    if (matches.length > 0) {
-        matches.forEach((m, idx) => {
-             const optId = m[1];
-             const nextMatch = matches[idx + 1];
-             const startIndex = m.index! + 2; 
-             const endIndex = nextMatch ? nextMatch.index : text.length;
-             let optContent = text.substring(startIndex, endIndex).trim();
-             options.push({ id: optId, text: optContent });
-        });
-        return options;
-    }
-    return null;
-};
-
-const detectCorrectAnswer = (fullText: string) => {
-    const match = fullText.match(/(?:Chọn|Đáp án)\s*([A-D])/i);
-    return match ? match[1].toUpperCase() : null;
 };
