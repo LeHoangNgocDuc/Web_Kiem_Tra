@@ -2,41 +2,34 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Thi Trắc Nghiệm Online</title>
-
+    <title>MathExam Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-
+    
     <script>
       window.MathJax = {
         tex: {
           inlineMath: [['$', '$'], ['\\(', '\\)']],
           displayMath: [['$$', '$$'], ['\\[', '\\]']],
-          processEscapes: true,
-        },
-        svg: {
-          fontCache: 'global'
+          processEscapes: true
         },
         startup: {
-          typeset: false // Để React tự quản lý việc render
+          typeset: false // Tắt tự động để React kiểm soát
         }
       };
     </script>
-
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-
+    
     <style>
-        .math-content img { display: block; margin: 10px auto; max-width: 100%; height: auto; border-radius: 5px; }
-        .math-content { font-size: 17px; line-height: 1.6; color: #333; }
-        /* Ẩn thanh cuộn nhưng vẫn cuộn được */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .math-content img { max-width: 100% !important; height: auto; display: block; margin: 10px 0; }
+      .math-content { font-size: 1.1rem; line-height: 1.6; }
+      /* Ẩn thanh cuộn xấu xí */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
   </head>
-  <body class="bg-gray-100 font-sans text-gray-900">
+  <body class="bg-gray-100">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
