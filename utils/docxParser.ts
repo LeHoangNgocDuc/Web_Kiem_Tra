@@ -14,8 +14,7 @@ export const parseDocx = async (file: File): Promise<Partial<ExamData>> => {
       }
       mammoth.convertToHtml({ arrayBuffer: arrayBuffer })
         .then(function(result: any) {
-          // QUAN TRỌNG: Giải mã các ký tự HTML entity để LaTeX hiển thị đúng
-          // Ví dụ: chuyển &lt; về <, &gt; về >
+          // Giải mã ký tự HTML để LaTeX hiển thị đúng (ví dụ < thành &lt;)
           let rawHtml = result.value;
           rawHtml = rawHtml.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
           
@@ -46,7 +45,7 @@ const parseHtmlToExam = (html: string): Partial<ExamData> => {
   
   let currentBuffer: string[] = []; 
   let questionCounter = 1; 
-  let parsingSolution = false; 
+  let parsingSolution = false; // Cờ đánh dấu đang đọc phần lời giải
 
   const createQuestion = (optionsArr: {id: string, text: string}[]) => {
       if (currentBuffer.length > 0) {
@@ -62,7 +61,7 @@ const parseHtmlToExam = (html: string): Partial<ExamData> => {
           
           answers.push({
               questionId: qId,
-              correctOptionId: "A", 
+              correctOptionId: "A", // Mặc định A
               solutionText: ""
           });
           
@@ -75,17 +74,30 @@ const parseHtmlToExam = (html: string): Partial<ExamData> => {
     let text = el.textContent?.trim() || "";
     let innerHTML = el.innerHTML;
     
+    // --- 1. SỬA LỖI QUAN TRỌNG TẠI ĐÂY ---
+    // Nếu dòng này bắt đầu bằng "Câu X", "Bài X" -> Chắc chắn là câu hỏi mới.
+    // -> Bắt buộc TẮT chế độ đọc lời giải ngay lập tức.
+    if (text.match(/^(Câu|Bài|Question)\s*\d+[:.]/i)) {
+        parsingSolution = false;
+    }
+
+    // 2. Nếu gặp từ khóa bắt đầu phần lời giải -> Bật chế độ bỏ qua
     if (text.match(/^(Lời giải|Hướng dẫn|Bảng đáp án|HẾT)/i)) {
         parsingSolution = true;
         return;
     }
+
+    // 3. Nếu đang trong chế độ đọc lời giải thì bỏ qua dòng này
     if (parsingSolution) return;
 
-    // Logic tìm đáp án (A. B. C. D.)
+    // 4. Logic tìm đáp án (A. B. C. D.) để ngắt câu
+    // Tìm dòng chứa "A." hoặc bắt đầu bằng A. B. C. D.
     const isOptionLine = (text.match(/^[A-D]\./) || (text.includes("A.") && text.includes("B.")));
 
     if (isOptionLine) {
+        // Tách các đáp án A, B, C, D từ dòng này
         const extractedOptions: {id: string, text: string}[] = [];
+        // Regex này lấy cả nội dung LaTeX bên trong
         const matches = [...text.matchAll(/([A-D])\./g)];
         
         if (matches.length > 0) {
@@ -94,7 +106,7 @@ const parseHtmlToExam = (html: string): Partial<ExamData> => {
                  const nextMatch = matches[idx + 1];
                  const startIndex = m.index! + 2; 
                  const endIndex = nextMatch ? nextMatch.index : text.length;
-                 // Cố gắng giữ lại LaTeX trong đáp án
+                 
                  let optContent = text.substring(startIndex, endIndex).trim();
                  extractedOptions.push({ id: optId, text: optContent });
             });
@@ -102,8 +114,9 @@ const parseHtmlToExam = (html: string): Partial<ExamData> => {
         createQuestion(extractedOptions);
     } 
     else {
-        // Xóa các chữ "Câu 1:" thừa
-        let cleanContent = innerHTML.replace(/^(?:<b>|<strong>)?(?:Câu|Bài|Question)?\s*\d+[:.]\s*(?:<\/b>|<\/strong>)?/i, '');
+        // Đây là nội dung câu hỏi
+        // Xóa chữ "Câu 1:" thừa ở đầu dòng cho đẹp
+        let cleanContent = innerHTML.replace(/^(?:<b>|<strong>)?(?:Câu|Bài|Question)\s*\d+[:.]\s*(?:<\/b>|<\/strong>)?/i, '');
         currentBuffer.push(cleanContent);
     }
   });
