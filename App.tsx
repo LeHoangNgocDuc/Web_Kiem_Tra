@@ -2,15 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { parseDocx } from './utils/docxParser';
 import { ExamData, Question, AnswerKey } from './types';
 
-// --- 1. COMPONENT HIỂN THỊ MATHJAX (QUAN TRỌNG) ---
-// Component này giúp tự động "vẽ" lại công thức toán mỗi khi nội dung thay đổi
+// --- PHẦN SỬA LỖI QUAN TRỌNG ---
+// Khai báo cho TypeScript biết MathJax là một biến toàn cục
+declare global {
+  interface Window {
+    MathJax: any;
+  }
+}
+// --------------------------------
+
+// --- 1. COMPONENT HIỂN THỊ MATHJAX ---
 const MathContent = ({ html, className = "" }: { html: string, className?: string }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Chỉ chạy khi MathJax đã tải xong
     if (ref.current && window.MathJax && window.MathJax.typesetPromise) {
-      // Gọi MathJax xử lý nội dung trong thẻ div này
-      window.MathJax.typesetPromise([ref.current]).catch((err: any) => console.log(err));
+      window.MathJax.typesetPromise([ref.current])
+        .catch((err: any) => console.log('MathJax error:', err));
     }
   }, [html]);
 
@@ -30,15 +39,13 @@ const QuestionItem = ({
     const baseStyle = "border p-3 rounded cursor-pointer transition flex items-center gap-2 hover:bg-gray-50";
     
     if (!isSubmitted) {
-      // Đang làm bài: Chọn thì xanh, chưa chọn thì trắng
       return userAnswer === optId 
         ? `${baseStyle} bg-blue-100 border-blue-500 ring-1 ring-blue-500` 
         : `${baseStyle} bg-white border-gray-300`;
     } else {
-      // Đã nộp bài
-      if (optId === answerKey?.correctOptionId) return `${baseStyle} bg-green-100 border-green-600 ring-1 ring-green-600`; // Đúng
-      if (userAnswer === optId && optId !== answerKey?.correctOptionId) return `${baseStyle} bg-red-100 border-red-500`; // Sai
-      return `${baseStyle} bg-white opacity-60`; // Các câu còn lại
+      if (optId === answerKey?.correctOptionId) return `${baseStyle} bg-green-100 border-green-600 ring-1 ring-green-600`; 
+      if (userAnswer === optId && optId !== answerKey?.correctOptionId) return `${baseStyle} bg-red-100 border-red-500`; 
+      return `${baseStyle} bg-white opacity-60`; 
     }
   };
 
@@ -48,7 +55,7 @@ const QuestionItem = ({
         <div className="flex items-baseline gap-2 mb-2">
           <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">Câu {q.number}</span>
         </div>
-        <MathContent html={q.text} className="text-lg" />
+        <MathContent html={q.text} className="text-lg font-medium" />
       </div>
 
       <div className="grid grid-cols-1 gap-3">
@@ -72,7 +79,7 @@ const QuestionItem = ({
              <div className="font-bold">
                 {userAnswer === answerKey.correctOptionId 
                   ? <span className="text-green-600">✓ Chính xác</span>
-                  : <span className="text-red-600">✗ Sai rồi. Đáp án đúng: <span className="text-xl inline-block border border-green-500 px-2 rounded bg-white text-green-700">{answerKey.correctOptionId}</span></span>
+                  : <span className="text-red-600">✗ Sai rồi. Đáp án đúng: <span className="text-xl inline-block border border-green-500 px-2 rounded bg-white text-green-700 mx-2">{answerKey.correctOptionId}</span></span>
                 }
              </div>
              <button 
@@ -84,7 +91,7 @@ const QuestionItem = ({
           </div>
           
           {showSolution && (
-            <div className="bg-white p-4 border border-blue-200 rounded shadow-sm text-gray-700">
+            <div className="bg-white p-4 border border-blue-200 rounded shadow-sm text-gray-700 animate-fade-in">
               <strong className="block mb-2 text-blue-700 border-b pb-1">Hướng dẫn giải:</strong>
               <MathContent html={answerKey.solutionText} />
             </div>
@@ -145,7 +152,7 @@ export default function App() {
           alert('Tải đề thành công!');
           setIsAdminMode(false);
         }
-      } catch (err) { alert('Lỗi: ' + err); }
+      } catch (err: any) { alert('Lỗi: ' + err.message); }
     }
   };
 
@@ -174,7 +181,7 @@ export default function App() {
   const scrollToQuestion = (id: string) => {
     const element = document.getElementById(`question-${id}`);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
@@ -196,8 +203,8 @@ export default function App() {
         </div>
         
         {isExamStarted && !isSubmitted && (
-           <div className="flex flex-col items-center bg-red-50 px-4 py-1 rounded border border-red-100">
-              <span className="text-xs text-red-500 font-bold uppercase">Thời gian còn lại</span>
+           <div className="flex flex-col items-center bg-red-50 px-4 py-1 rounded border border-red-100 shadow-sm">
+              <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Thời gian còn lại</span>
               <span className="text-xl font-mono font-bold text-red-600">{fmtTime(timeLeft)}</span>
            </div>
         )}
@@ -272,15 +279,15 @@ export default function App() {
       {isExamStarted && exam && (
         <div className="max-w-7xl mx-auto mt-6 px-2 md:px-4 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           
-          {/* CỘT TRÁI: DANH SÁCH CÂU HỎI (Chiếm 8 hoặc 9 phần) */}
-          <div className="md:col-span-8 lg:col-span-9">
+          {/* CỘT TRÁI: DANH SÁCH CÂU HỎI */}
+          <div className="md:col-span-8 lg:col-span-9 order-2 md:order-1">
             {isSubmitted && (
-              <div className="bg-green-50 border border-green-200 p-6 mb-6 rounded-lg flex items-center justify-between">
-                 <div>
+              <div className="bg-green-50 border border-green-200 p-6 mb-6 rounded-lg flex flex-col md:flex-row items-center justify-between shadow-sm">
+                 <div className="text-center md:text-left mb-4 md:mb-0">
                    <h2 className="text-2xl font-bold text-green-700">Kết quả: {score} điểm</h2>
                    <p className="text-green-600">Số câu đúng: {exam.answers.filter(a => userAnswers[a.questionId] === a.correctOptionId).length} / {exam.questions.length}</p>
                  </div>
-                 <button onClick={() => {setIsExamStarted(false); setExam(null); localStorage.removeItem('EXAM_DATA');}} className="px-4 py-2 bg-white border border-green-500 text-green-700 rounded hover:bg-green-100">
+                 <button onClick={() => {setIsExamStarted(false); setExam(null); localStorage.removeItem('EXAM_DATA');}} className="px-6 py-2 bg-white border border-green-500 text-green-700 rounded hover:bg-green-100 font-bold transition">
                    Làm đề khác
                  </button>
               </div>
@@ -298,26 +305,25 @@ export default function App() {
             ))}
           </div>
 
-          {/* CỘT PHẢI: BẢNG TRẢ LỜI (SIDEBAR - Giống Azota) */}
-          <div className="md:col-span-4 lg:col-span-3 sticky top-24">
+          {/* CỘT PHẢI: BẢNG TRẢ LỜI (SIDEBAR) */}
+          <div className="md:col-span-4 lg:col-span-3 sticky top-24 order-1 md:order-2 mb-6 md:mb-0">
             <div className="bg-white p-4 rounded-lg shadow border border-gray-200 max-h-[calc(100vh-120px)] overflow-y-auto">
                <h3 className="font-bold text-gray-700 mb-3 text-center border-b pb-2">Danh sách câu hỏi</h3>
                
                <div className="grid grid-cols-5 gap-2">
-                 {exam.questions.map((q, idx) => {
-                   // Logic màu nút
+                 {exam.questions.map((q) => {
                    let btnClass = "bg-white border-gray-300 text-gray-600 hover:bg-gray-100";
                    
                    if (!isSubmitted) {
-                      if (userAnswers[q.id]) btnClass = "bg-blue-600 text-white border-blue-600";
+                      if (userAnswers[q.id]) btnClass = "bg-blue-600 text-white border-blue-600 shadow-md transform scale-105";
                    } else {
                       const ansKey = exam.answers.find(a => a.questionId === q.id);
                       if (ansKey && userAnswers[q.id] === ansKey.correctOptionId) {
-                         btnClass = "bg-green-500 text-white border-green-500"; // Đúng
+                         btnClass = "bg-green-500 text-white border-green-500"; 
                       } else if (userAnswers[q.id]) {
-                         btnClass = "bg-red-500 text-white border-red-500"; // Sai
+                         btnClass = "bg-red-500 text-white border-red-500"; 
                       } else {
-                         btnClass = "bg-gray-100 text-gray-400"; // Chưa làm
+                         btnClass = "bg-gray-100 text-gray-400"; 
                       }
                    }
 
@@ -325,7 +331,7 @@ export default function App() {
                      <button
                        key={q.id}
                        onClick={() => scrollToQuestion(q.id)}
-                       className={`w-full aspect-square flex items-center justify-center text-sm font-bold rounded border transition ${btnClass}`}
+                       className={`w-full aspect-square flex items-center justify-center text-sm font-bold rounded border transition-all duration-200 ${btnClass}`}
                      >
                        {q.number}
                      </button>
@@ -336,7 +342,7 @@ export default function App() {
                {!isSubmitted && (
                  <button 
                    onClick={() => { if(confirm('Bạn có chắc chắn muốn nộp bài?')) handleSubmit() }}
-                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded shadow transition"
+                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded shadow transition transform active:scale-95"
                  >
                    NỘP BÀI
                  </button>
