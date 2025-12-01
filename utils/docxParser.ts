@@ -1,5 +1,11 @@
-// @ts-nocheck
 import { ExamData, Question, AnswerKey } from '../types';
+
+// Khai báo biến window mở rộng để tránh lỗi TypeScript
+declare global {
+  interface Window {
+    mammoth: any;
+  }
+}
 
 export const parseDocx = async (file: File): Promise<Partial<ExamData>> => {
   return new Promise((resolve, reject) => {
@@ -8,8 +14,8 @@ export const parseDocx = async (file: File): Promise<Partial<ExamData>> => {
     reader.onload = function(event) {
       const arrayBuffer = event.target?.result;
       
-      // Lấy mammoth từ window (đã load ở index.html)
-      const mammoth = (window as any).mammoth;
+      // Lấy mammoth từ window an toàn
+      const mammoth = window.mammoth;
 
       if (!mammoth) {
         reject("Lỗi: Thư viện Mammoth chưa tải được. Hãy tải lại trang (F5).");
@@ -21,7 +27,7 @@ export const parseDocx = async (file: File): Promise<Partial<ExamData>> => {
           let rawHtml = result.value;
           // Giải mã ký tự HTML
           rawHtml = rawHtml.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-          // Chuyển đổi MathType block \[...\] sang inline $...$ để không vỡ dòng
+          // Chuyển đổi MathType block sang inline để không vỡ dòng
           rawHtml = rawHtml.replace(/\\\[/g, '$').replace(/\\\]/g, '$');
 
           const parsedData = parseHtmlToExam(rawHtml, file.name);
@@ -39,7 +45,7 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   
-  // 1. TỰ ĐỘNG TÌM THỜI GIAN (VD: "Thời gian: 90 phút")
+  // Tự động tìm thời gian
   const fullText = doc.body.textContent || "";
   const timeMatch = fullText.match(/Thời gian(?: làm bài)?\s*[:.]?\s*(\d+)\s*(?:phút|'|phut)/i);
   let detectedDuration = 45; 
@@ -47,11 +53,9 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
       detectedDuration = parseInt(timeMatch[1]);
   }
 
-  // 2. XỬ LÝ CÂU HỎI
   const questions: Question[] = [];
   const answers: AnswerKey[] = [];
   
-  // Lấy danh sách thẻ, lọc các thẻ rỗng
   const elements = Array.from(doc.body.children).filter(el => {
       const text = el.textContent?.trim();
       const hasImg = el.querySelector('img');
@@ -68,7 +72,6 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
       if (currentQBuffer.length > 0) {
           const qId = `q_${Date.now()}_${questionCounter}`;
           
-          // Nối chuỗi: Ảnh thì xuống dòng, chữ thì nối liền
           const qText = currentQBuffer.reduce((acc, curr, idx) => {
               if (idx === 0) return curr;
               if (curr.includes("<img")) return acc + "<br/>" + curr;
@@ -107,17 +110,14 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
     let text = el.textContent?.trim() || "";
     let innerHTML = el.innerHTML;
     
-    // Regex bắt "Câu 1:", "Bài 1:", "Question 1"
     const newQuestionMatch = text.match(/^(Câu|Bài|Question)\s*\d+[:.]/i);
     
     if (newQuestionMatch) {
-        saveQuestion(); // Lưu câu cũ
-        // Reset biến
+        saveQuestion(); 
         isScanningSolution = false;
         currentQBuffer = [];
         currentSBuffer = [];
         tempOptions = [];
-        // Xóa chữ "Câu 1:"
         let cleanContent = innerHTML.replace(/^(?:<b>|<strong>)?(?:Câu|Bài|Question)\s*\d+[:.]\s*(?:<\/b>|<\/strong>)?\s*/i, '');
         currentQBuffer.push(cleanContent);
         return;
@@ -140,7 +140,7 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
     }
   });
 
-  saveQuestion(); // Lưu câu cuối
+  saveQuestion();
 
   return { 
       title: fileName.replace('.docx', ''), 
