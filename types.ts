@@ -1,12 +1,12 @@
 export interface QuestionOption {
-  id: string;   // Ví dụ: "A", "B", "C", "D"
-  text: string; // Nội dung HTML của đáp án
+  id: string;   
+  text: string; 
 }
 
 export interface Question {
   id: string;
   number: number;
-  text: string; // Nội dung HTML của câu hỏi
+  text: string; 
   options: QuestionOption[];
 }
 
