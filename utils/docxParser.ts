@@ -1,23 +1,27 @@
 import { ExamData, Question, AnswerKey } from '../types';
 
-declare const mammoth: any;
-
 export const parseDocx = async (file: File): Promise<Partial<ExamData>> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
     reader.onload = function(event) {
       const arrayBuffer = event.target?.result;
-      if (typeof mammoth === 'undefined') {
-        reject("Lỗi: Thư viện Mammoth chưa tải được.");
+      
+      // SỬA LỖI Ở ĐÂY: Dùng (window as any) để tránh lỗi TypeScript
+      const mammoth = (window as any).mammoth;
+
+      if (!mammoth) {
+        reject("Lỗi: Thư viện Mammoth chưa tải được. Vui lòng F5 lại trang.");
         return;
       }
+
       mammoth.convertToHtml({ arrayBuffer: arrayBuffer })
         .then(function(result: any) {
           let rawHtml = result.value;
-          // Giải mã HTML và chuyển đổi MathType
+          // Giải mã ký tự HTML
           rawHtml = rawHtml.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-          rawHtml = rawHtml.replace(/\\\[/g, '$').replace(/\\\]/g, '$'); // Ép công thức xuống dòng thành cùng dòng
+          // Chuyển đổi MathType block sang inline để không bị vỡ dòng
+          rawHtml = rawHtml.replace(/\\\[/g, '$').replace(/\\\]/g, '$');
 
           const parsedData = parseHtmlToExam(rawHtml, file.name);
           resolve(parsedData);
@@ -34,17 +38,15 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   
-  // --- 1. TỰ ĐỘNG TÌM THỜI GIAN LÀM BÀI ---
-  // Tìm trong toàn bộ văn bản các cụm từ như: "Thời gian: 90 phút", "90'", "120 phut"
+  // 1. TỰ ĐỘNG TÌM THỜI GIAN
   const fullText = doc.body.textContent || "";
   const timeMatch = fullText.match(/Thời gian(?: làm bài)?\s*[:.]?\s*(\d+)\s*(?:phút|'|phut)/i);
-  let detectedDuration = 45; // Mặc định 45 phút nếu không tìm thấy
-  
+  let detectedDuration = 45; 
   if (timeMatch && timeMatch[1]) {
       detectedDuration = parseInt(timeMatch[1]);
   }
 
-  // --- 2. XỬ LÝ CÂU HỎI NHƯ CŨ ---
+  // 2. XỬ LÝ CÂU HỎI
   const questions: Question[] = [];
   const answers: AnswerKey[] = [];
   
@@ -64,14 +66,12 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
       if (currentQBuffer.length > 0) {
           const qId = `q_${Date.now()}_${questionCounter}`;
           
-          // Logic nối chuỗi thông minh (giữ ảnh, nối text)
           const qText = currentQBuffer.reduce((acc, curr, idx) => {
               if (idx === 0) return curr;
               if (curr.includes("<img")) return acc + "<br/>" + curr;
               return acc + " " + curr;
           }, "");
 
-          // Logic xử lý lời giải
           let sText = "";
           if (currentSBuffer.length > 0) {
               sText = currentSBuffer.reduce((acc, curr, idx) => {
@@ -93,7 +93,7 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
           answers.push({
               questionId: qId,
               correctOptionId: detectedAns || "A", 
-              solutionText: sText // Vẫn lưu lời giải, nhưng UI sẽ quyết định hiện hay không
+              solutionText: sText 
           });
           
           questionCounter++;
@@ -137,8 +137,8 @@ const parseHtmlToExam = (html: string, fileName: string): Partial<ExamData> => {
   saveQuestion();
 
   return { 
-      title: fileName.replace('.docx', ''), // Lấy tên file làm tên đề thi
-      duration: detectedDuration, // Trả về thời gian tìm được
+      title: fileName.replace('.docx', ''), 
+      duration: detectedDuration, 
       questions, 
       answers 
   };
