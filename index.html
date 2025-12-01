@@ -11,43 +11,23 @@
     <script>
       window.MathJax = {
         tex: {
-          // Khai báo dấu $ là công thức toán (Inline)
           inlineMath: [['$', '$'], ['\\(', '\\)']],
-          // Khai báo $$ hoặc \[ \] là công thức toán khối (Block)
           displayMath: [['$$', '$$'], ['\\[', '\\]']],
           processEscapes: true,
         },
-        svg: {
-          fontCache: 'global'
-        },
-        startup: {
-          // Tắt tự động chạy ban đầu để React kiểm soát việc vẽ lại khi cần
-          typeset: false 
-        }
+        svg: { fontCache: 'global' },
+        startup: { typeset: false }
       };
     </script>
 
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 
     <style>
-        /* Tùy chỉnh thanh cuộn cho đẹp */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-        
-        /* QUAN TRỌNG: Sửa lỗi ảnh trong đề thi bị to quá khổ */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .math-content img {
             max-width: 100% !important;
             height: auto !important;
@@ -56,17 +36,13 @@
             display: inline-block;
             vertical-align: middle;
         }
-        
-        /* Phóng to công thức toán lên một chút cho dễ đọc */
-        mjx-container {
-            font-size: 115% !important; 
-        }
+        mjx-container { font-size: 115% !important; }
     </style>
   </head>
   
   <body class="bg-gray-100 text-gray-800 antialiased">
     <div id="root"></div>
     
-    <script type="module" src="/src/index.tsx"></script>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
