@@ -1,6 +1,7 @@
-/// <reference types="vite/client" />
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-interface Window {
-  MathJax: any;
-  mammoth: any;
-}
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})
