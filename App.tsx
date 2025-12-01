@@ -1,11 +1,16 @@
-// @ts-nocheck
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { parseDocx } from './utils/docxParser';
 import { ExamData, Question, AnswerKey } from './types';
 
-// --- COMPONENT HIỂN THỊ TOÁN (PHIÊN BẢN CƯỠNG CHẾ) ---
-const MathContent = ({ html, id }) => {
-  // Dùng useLayoutEffect để chạy ngay sau khi DOM được vẽ
+// Khai báo MathJax cho TypeScript hiểu
+declare global {
+  interface Window {
+    MathJax: any;
+  }
+}
+
+// --- COMPONENT HIỂN THỊ CÔNG THỨC TOÁN ---
+const MathContent = ({ html, id }: { html: string, id: string }) => {
   useLayoutEffect(() => {
     if (window.MathJax && window.MathJax.typesetPromise) {
       const element = document.getElementById(id);
@@ -20,7 +25,8 @@ const MathContent = ({ html, id }) => {
 
 // --- APP CHÍNH ---
 export default function App() {
-  const [exam, setExam] = useState(() => {
+  // Sửa lỗi: Định nghĩa rõ kiểu dữ liệu cho exam là ExamData hoặc null
+  const [exam, setExam] = useState<ExamData | null>(() => {
     try {
       const saved = localStorage.getItem('EXAM_DATA');
       return saved ? JSON.parse(saved) : null;
@@ -32,10 +38,13 @@ export default function App() {
   const [duration, setDuration] = useState(45);
   const [isStarted, setIsStarted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [answers, setAnswers] = useState({});
+  
+  // Sửa lỗi: Định nghĩa rõ kiểu dữ liệu cho answers là object chứa chuỗi
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  
   const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
-  const [showSolutionId, setShowSolutionId] = useState(null); // ID câu hỏi đang mở lời giải
+  const [score, setScore] = useState("0");
+  const [showSolutionId, setShowSolutionId] = useState<string | null>(null);
 
   // Đồng hồ
   useEffect(() => {
@@ -49,22 +58,27 @@ export default function App() {
     return () => clearInterval(timer);
   }, [isStarted, submitted, timeLeft]);
 
-  const handleUpload = async (e) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      const data = await parseDocx(e.target.files[0]);
-      if (data.questions) {
-        const newExam = {
-          id: Date.now().toString(),
-          title: data.title || "Đề thi mới",
-          duration: duration,
-          questions: data.questions,
-          answers: data.answers,
-          isActive: true
-        };
-        setExam(newExam);
-        localStorage.setItem('EXAM_DATA', JSON.stringify(newExam));
-        setIsAdmin(false);
-        alert("Upload thành công!");
+      try {
+        const data = await parseDocx(e.target.files[0]);
+        // Ép kiểu dữ liệu để TypeScript không báo lỗi
+        if (data.questions && data.answers) {
+          const newExam: ExamData = {
+            id: Date.now().toString(),
+            title: data.title || "Đề thi mới",
+            duration: duration,
+            questions: data.questions as Question[],
+            answers: data.answers as AnswerKey[],
+            isActive: true
+          };
+          setExam(newExam);
+          localStorage.setItem('EXAM_DATA', JSON.stringify(newExam));
+          setIsAdmin(false);
+          alert("Upload thành công!");
+        }
+      } catch (err) {
+        alert("Lỗi đọc file: " + err);
       }
     }
   };
@@ -73,13 +87,14 @@ export default function App() {
     if (!exam) return;
     setAnswers({});
     setSubmitted(false);
-    setScore(0);
+    setScore("0");
     setTimeLeft(exam.duration * 60);
     setIsStarted(true);
     window.scrollTo(0,0);
   };
 
   const handleSubmit = () => {
+    if (!exam) return;
     let correct = 0;
     exam.answers.forEach(a => {
       if (answers[a.questionId] === a.correctOptionId) correct++;
@@ -90,9 +105,9 @@ export default function App() {
     window.scrollTo(0,0);
   };
 
-  const fmtTime = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  const fmtTime = (s: number) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 
-  const scrollToQ = (id) => {
+  const scrollToQ = (id: string) => {
     document.getElementById(`q-box-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -154,7 +169,7 @@ export default function App() {
       {isStarted && exam && (
         <div className="max-w-[1440px] mx-auto mt-6 px-4 flex flex-col lg:flex-row gap-6 items-start">
           
-          {/* CỘT TRÁI: CÂU HỎI (Chiếm phần lớn) */}
+          {/* CỘT TRÁI: CÂU HỎI */}
           <div className="flex-1 w-full lg:w-3/4">
             {submitted && (
               <div className="bg-white p-6 rounded shadow border-l-8 border-green-500 mb-6 flex justify-between items-center">
@@ -172,7 +187,6 @@ export default function App() {
                 <div key={q.id} id={`q-box-${q.id}`} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6 scroll-mt-24">
                   <div className="mb-4">
                     <span className="bg-blue-100 text-blue-800 font-bold px-2 py-1 rounded text-sm mr-2">Câu {idx + 1}</span>
-                    {/* Render đề bài với ID duy nhất để MathJax tìm thấy */}
                     <MathContent id={`math-q-${q.id}`} html={q.text} />
                   </div>
 
@@ -182,7 +196,7 @@ export default function App() {
                       if (!submitted) {
                         if (answers[q.id] === opt.id) bg = "bg-blue-50 border-blue-500 ring-1 ring-blue-500";
                       } else {
-                        if (opt.id === ansKey.correctOptionId) bg = "bg-green-50 border-green-500 ring-1 ring-green-500";
+                        if (ansKey && opt.id === ansKey.correctOptionId) bg = "bg-green-50 border-green-500 ring-1 ring-green-500";
                         else if (answers[q.id] === opt.id) bg = "bg-red-50 border-red-500";
                         else bg = "bg-white opacity-60";
                       }
